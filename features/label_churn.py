@@ -19,61 +19,114 @@
 # - general rules
 
 import pandas as pd
+import numpy as np
+from pathlib import Path
 
-# Parameters
+# -----------------------------
+# CONFIG
+# -----------------------------
 MAX_INACTIVITY_DAYS = 45
+RAW_PATH = Path("data/raw")
+PROCESSED_PATH = Path("data/processed")
+PROCESSED_PATH.mkdir(parents=True, exist_ok=True)
 
-# 1. Load Data
-customers = pd.read_csv("data/raw/customers.csv", parse_dates=["signup_date"])
-events = pd.read_csv("data/raw/usage_events.csv", parse_dates=["timestamp"])
-subscriptions = pd.read_csv("data/raw/subscriptions.csv", parse_dates=["billing_date"])
+# -----------------------------
+# 1. LOAD DATA
+# -----------------------------
+customers = pd.read_csv(RAW_PATH / "customers.csv", parse_dates=["signup_date"])
+events = pd.read_csv(RAW_PATH / "usage_events.csv", parse_dates=["timestamp"])
+subscriptions = pd.read_csv(RAW_PATH / "subscriptions.csv", parse_dates=["billing_date"])
 
-# 2. Set Reference Time (T_ref)
-T_ref = max(events["timestamp"].max(), subscriptions["billing_date"].max())
-
-# 3. Aggregate Last Activity per Customer
-# Usage Events
-last_usage = events[events['type'] == 'usage'].groupby("customer_id")["timestamp"].max().rename("last_usage")
-# Login Events
-last_login = events[events['type'] == 'login'].groupby("customer_id")["timestamp"].max().rename("last_login")
-
-# Subscription Info: Get the very last record for each customer to determine plan & billing status
-last_sub_record = subscriptions.sort_values("billing_date").groupby("customer_id").tail(1)
-last_sub_record = last_sub_record.set_index("customer_id")[["billing_date", "status", "plan_type"]]
-
-# 4. Merge all data onto the Customers Master List
-df = customers.merge(last_usage, on="customer_id", how="left")
-df = df.merge(last_login, on="customer_id", how="left")
-df = df.merge(last_sub_record, on="customer_id", how="left")
-
-# 5. Calculate Days Since Last Activity (Fill missing with signup_date or far past)
-df["days_since_usage"] = (T_ref - df["last_usage"].fillna(df["signup_date"])).dt.days
-df["days_since_login"] = (T_ref - df["last_login"].fillna(df["signup_date"])).dt.days
-df["days_since_billing"] = (T_ref - df["billing_date"]).dt.days
-df["tenure_total"] = (T_ref - df["signup_date"]).dt.days
-
-# 6. Define Churn Logic (Vectorized)
-
-# Rule: General (Applies to all)
-# Tenure >= 45 AND no usage in 45 AND no login in 45
-general_churn_criteria = (
-    (df["tenure_total"] >= MAX_INACTIVITY_DAYS) &
-    (df["days_since_usage"] >= MAX_INACTIVITY_DAYS) &
-    (df["days_since_login"] >= MAX_INACTIVITY_DAYS)
+# -----------------------------
+# 2. GLOBAL REFERENCE DATE
+# -----------------------------
+T_ref = max(
+    events["timestamp"].max(),
+    subscriptions["billing_date"].max()
 )
 
-# Rule: Paid Customer Check
-# If they have a "paid" plan, they must ALSO have no successful billing in 45 days
-is_paid = df["plan_type"] == "paid"
-no_recent_payment = (df["days_since_billing"] >= MAX_INACTIVITY_DAYS) | (df["status"] != "success")
+# -----------------------------
+# 3. LAST USAGE DATE
+# -----------------------------
+last_usage = (
+    events.groupby("customer_id")["timestamp"]
+    .max()
+    .rename("last_usage_date")
+)
 
-# Combine Logic
-# Churn if General Criteria met AND (if they are paid, they must also meet the payment criteria)
+# -----------------------------
+# 4. LAST SUCCESSFUL PAYMENT DATE
+# -----------------------------
+success_payments = subscriptions[subscriptions["status"] == "success"]
+
+last_success_payment = (
+    success_payments.groupby("customer_id")["billing_date"]
+    .max()
+    .rename("last_success_payment_date")
+)
+
+# -----------------------------
+# 5. MERGE BASE TABLE
+# -----------------------------
+df = customers.merge(last_usage, on="customer_id", how="left")
+df = df.merge(last_success_payment, on="customer_id", how="left")
+
+# -----------------------------
+# 6. TENURE CALCULATION
+# -----------------------------
+df["tenure_days"] = (T_ref - df["signup_date"]).dt.days
+
+# -----------------------------
+# 7. DAYS SINCE LAST ACTIVITY
+# -----------------------------
+df["days_since_usage"] = (
+    T_ref - df["last_usage_date"]
+).dt.days
+
+df["days_since_success_payment"] = (
+    T_ref - df["last_success_payment_date"]
+).dt.days
+
+# If no usage ever → treat as very high inactivity
+df["days_since_usage"] = df["days_since_usage"].fillna(np.inf)
+
+# If no successful payment ever → treat as very high inactivity
+df["days_since_success_payment"] = df["days_since_success_payment"].fillna(np.inf)
+
+# -----------------------------
+# 8. EXCLUDE NEW USERS
+# -----------------------------
+df = df[df["tenure_days"] >= MAX_INACTIVITY_DAYS].copy()
+
+# -----------------------------
+# 9. CHURN LOGIC
+# -----------------------------
+is_paid = df["plan_type"] != "free"
+
 df["churn_label"] = 0
-df.loc[general_churn_criteria & (~is_paid | (is_paid & no_recent_payment)), "churn_label"] = 1
 
-# 7. Final Output
-churned_df = df[["customer_id", "churn_label", "tenure_total"]].rename(columns={"tenure_total": "inactivity_tenure_days"})
-churned_df.to_csv("data/processed/churned_labels.csv", index=False)
+df.loc[
+    (df["days_since_usage"] >= MAX_INACTIVITY_DAYS) &
+    (
+        (~is_paid) |
+        (is_paid & (df["days_since_success_payment"] >= MAX_INACTIVITY_DAYS))
+    ),
+    "churn_label"
+] = 1
 
-print(f"Labeling complete. Churn rate: {df['churn_label'].mean():.2%}")
+# -----------------------------
+# 10. OUTPUT
+# -----------------------------
+output = df[[
+    "customer_id",
+    "churn_label",
+    "tenure_days",
+    "days_since_usage",
+    "days_since_success_payment"
+]]
+
+output.to_csv(PROCESSED_PATH / "churn_labels.csv", index=False)
+
+print("Churn labeling complete.")
+print(f"Total labeled users: {len(output)}")
+print(f"Churn rate: {output['churn_label'].mean():.2%}")

@@ -7,15 +7,18 @@ Engagement Features:
 
 Payment Features: 
 
-- payment_failures_30d
-- avg_transaction_amount_90d
-- days_since_last_payment
+- successful_payments_last_90d
+- avg_payment_last_90d
+- days_since_last_success_payment
 - failed_payments_last_30d
+- total_revenue_lifetime
 
 Support Features:
 
 - tickets_last_30d
-- avg_resolution_time
+- tickets_last_90d
+- avg_resolution_hours_90d
+- billing_related_tickets_90d
 
 Temporal Features:
 

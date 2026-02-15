@@ -25,5 +25,5 @@ model_df = model_df.merge(trend_features, on='customer_id', how='left')
 
 model_df = model_df.fillna(0)
 
-model_df.to_csv(f"{DATA_PATH}/modeling_features.csv", index=False)
+model_df.to_parquet(f"{DATA_PATH}/modeling_features.parquet", index=False)
 print("modeling features built successfully.")

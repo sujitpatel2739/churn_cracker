@@ -23,7 +23,8 @@ model_df = model_df.merge(billing_features, on='customer_id', how='left')
 model_df = model_df.merge(tickets_features, on='customer_id', how='left')
 model_df = model_df.merge(trend_features, on='customer_id', how='left')
 
-model_df = model_df.fillna(0)
+feature_cols = [col for col in model_df.columns if col not in ["customer_id", "churn_label"]]
+model_df[feature_cols] = model_df[feature_cols].fillna(0)
 
 model_df.to_parquet(f"{DATA_PATH}/modeling_features.parquet", index=False)
 print("modeling features built successfully.")

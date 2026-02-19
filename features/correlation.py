@@ -12,6 +12,8 @@ modeling_df_numeric = modeling_df.select_dtypes('number')
 
 corr = modeling_df_numeric.corr()
 
+# corr = numeric_df.corr()["churn_label"].drop("churn_label")
+
 corr_pairs = (
     corr.unstack()                                # (col_a, col_b) -> correlation
         .dropna()                                 # drop NaNs
@@ -50,3 +52,14 @@ sns.heatmap(neg, annot=True, fmt=".2f", cmap="Reds_r", center=0)
 plt.title("Positive & Negative Correlations")
 plt.tight_layout()
 plt.show()
+
+
+# Mean around:
+# - Churn label 1
+# - Churn label 0
+
+mean_churned = modeling_df_numeric[modeling_df_numeric['churn_label'] == 1].mean()
+mean_non_churned = modeling_df_numeric[modeling_df_numeric['churn_label'] == 0].mean()
+
+print(mean_churned)
+print(mean_non_churned)

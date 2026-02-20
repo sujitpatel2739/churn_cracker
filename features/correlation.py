@@ -6,7 +6,6 @@ import seaborn as sns
 
 DATA_PATH = 'data/processed'
 modeling_df = pd.read_parquet(f'{DATA_PATH}/modeling_table.parquet')
-# print(modeling_df.head())
 
 modeling_df_numeric = modeling_df.select_dtypes('number')
 
@@ -58,8 +57,13 @@ plt.show()
 # - Churn label 1
 # - Churn label 0
 
-mean_churned = modeling_df_numeric[modeling_df_numeric['churn_label'] == 1].mean()
-mean_non_churned = modeling_df_numeric[modeling_df_numeric['churn_label'] == 0].mean()
+# mean per group
+group_means = modeling_df.groupby("churn_label").mean(numeric_only=True)
 
-print(mean_churned)
-print(mean_non_churned)
+# Difference between churn=1 & churn=0
+difference = group_means.loc[1] - group_means.loc[0]
+difference = difference.drop("churn_label", errors="ignore")
+
+# Sorting by magnitude (Optional)
+difference = difference.sort_values(ascending=False)
+print(difference)

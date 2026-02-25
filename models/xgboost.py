@@ -27,3 +27,16 @@ model.fit(X_train, y_train,
           early_stopping_rounds=20,
           verbose=True)
 
+# Evaluating the trained model on AUC-ROC curve and Precision@Top10%
+model = XGBClassifier()
+model.load_model('xgboost.xgb')
+
+from sklearn.metrics import accuracy_score
+
+y_score = model.predict_proba(X_test)[:, 1]  # probability of class 1
+
+# Finding the AUC-ROC
+# y_true: shape (n_samples,), values 0 or 1
+# y_score: shape (n_samples,), predicted probabilities for the positive class
+auc = roc_auc_score(y_test, y_score)
+print("ROC-AUC:", auc)

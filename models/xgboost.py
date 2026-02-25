@@ -4,16 +4,17 @@ import numpy as np
 from xgboost import XGBClassifier
 from sklearn.metrics import roc_auc_score, precision_score
 
-# Drop the labels and customer_id columns from train_df and test df
-X_train = train_df.drop(columns=['customer_id', 'churn_label'])
+# Drop the signup_date, churn_label and customer_id columns from train_df and test df
+X_train = train_df.drop(columns=['customer_id', 'churn_label', 'signup_date'])
 y_train = train_df['churn_label']
-X_test = test_df.drop(columns=['customer_id', 'churn_label'])
+
+X_test = test_df.drop(columns=['customer_id', 'churn_label', 'signup_date'])
 y_test = test_df['churn_label']
 
 
 # Initializing and training the model
 model = XGBClassifier(
-    n_estimators=200,
+    n_estimators=300,
     max_depth=6,
     learning_rate=0.1,
     subsample=0.8,
@@ -23,9 +24,13 @@ model = XGBClassifier(
     random_state=42
 )
 
-model.fit(X_train, y_train,
-          early_stopping_rounds=20,
-          verbose=True)
+model.fit(
+    X_train,
+    y_train,
+    eval_set=[(X_test, y_test)],
+    early_stopping_rounds=20,
+    verbose=False
+)
 
 model.save_model('xgboost.xgb')
 
@@ -33,22 +38,19 @@ model.save_model('xgboost.xgb')
 model = XGBClassifier()
 model.load_model('xgboost.xgb')
 
-from sklearn.metrics import accuracy_score
+# Predict probabilities
+y_score = model.predict_proba(X_test)[:, 1]
 
-y_score = model.predict_proba(X_test)[:, 1]  # probability of class 1
-
-# Finding the AUC-ROC
-# y_true: shape (n_samples,), values 0 or 1
-# y_score: shape (n_samples,), predicted probabilities for the positive class
+# ROC-AUC
 auc = roc_auc_score(y_test, y_score)
 print("ROC-AUC:", auc)
 
-# Finding the Precision@Top10% (K = 10%)
+# Precision@Top10%
 n = len(X_test)
 K = max(1, int(np.ceil(0.10 * n)))
 
-idx_sorted = np.argsort(-np.asarray(y_score))
-top_k_true = np.sum(np.asarray(y_test)[idx_sorted[:K]] == 1)
+idx_sorted = np.argsort(-y_score)
+top_k_true = np.sum(y_test.iloc[idx_sorted[:K]] == 1)
 precision_topk = top_k_true / K
 
 print("Precision@Top10%:", precision_topk)

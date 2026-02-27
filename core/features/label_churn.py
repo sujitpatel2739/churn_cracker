@@ -88,10 +88,9 @@ df["days_since_success_payment"] = (
 ).dt.days
 
 # If no usage ever → treat as very high inactivity
-df["days_since_usage"] = df["days_since_usage"].fillna(np.inf)
-
+df["days_since_usage"] = df["days_since_usage"].fillna(999)
 # If no successful payment ever → treat as very high inactivity
-df["days_since_success_payment"] = df["days_since_success_payment"].fillna(np.inf)
+df["days_since_success_payment"] = df["days_since_success_payment"].fillna(999)
 
 # -----------------------------
 # 8. EXCLUDE NEW USERS

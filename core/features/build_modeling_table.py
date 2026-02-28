@@ -24,7 +24,10 @@ model_df = model_df.merge(tickets_features, on='customer_id', how='left')
 model_df = model_df.merge(trend_features, on='customer_id', how='left')
 
 feature_cols = [col for col in model_df.columns if col not in ["customer_id", "churn_label"]]
-model_df[feature_cols] = model_df[feature_cols].fillna(0)
 
-model_df.to_parquet(f"{DATA_PATH}/modeling_features.parquet", index=False)
+model_df[feature_cols] = model_df[feature_cols].fillna(0)
+model_df.drop(columns=['days_since_usage', 'days_since_last_success_payment'], inplace=True)
+
+model_df.to_parquet(f"{DATA_PATH}/modeling_table.parquet", index=False)
+model_df.to_csv(f"{DATA_PATH}/modeling_table.csv", index=False)
 print("modeling features built successfully.")

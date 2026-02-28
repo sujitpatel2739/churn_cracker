@@ -2,8 +2,11 @@
 
 # -----------------------------
 
-# Inactivity measuring reference date
-# - T_ref = Dataset_end_date
+# Inactivity measuring reference dates
+# T_ref = Dataset_end_date
+# FAETURE_LOOKBACK = 90 (days)
+# CHURN_HORIZON = 45 (days)
+# MUST SATISFY: signup_date + 90 days <= T0 <= T_ref - 45 days
 
 # Consitions for labeling a customer as churned:
 # General:

@@ -11,7 +11,7 @@ events = pd.read_csv(RAW_PATH / "usage_events.csv", parse_dates=["timestamp"])
 subscriptions = pd.read_csv(RAW_PATH / "subscriptions.csv", parse_dates=["billing_date"])
 
 # Global reference time
-earliest_event_date = events['timestamp'].min()
+earliest_event_dates = events['timestamp'].groupby('customer_id').min()
 T_ref = max(
     events["timestamp"].max(),
     subscriptions["billing_date"].max()
